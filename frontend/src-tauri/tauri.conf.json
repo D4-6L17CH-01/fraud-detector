@@ -12,9 +12,12 @@
   "app": {
     "windows": [
       {
-        "title": "fraud-detector",
-        "width": 800,
-        "height": 600
+        "title": "Detector de Fraudes",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 1024,
+        "minHeight": 768,
+        "maximized": true
       }
     ],
     "security": {
