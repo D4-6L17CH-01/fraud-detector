@@ -1,12 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import copy_metadata
+
+datas = [('PRODUCCION_CAMPEON_binario.joblib', '.'), ('PRODUCCION_CAMPEON_multiclase.joblib', '.')]
+binaries = []
+hiddenimports = ['sklearn', 'pandas', 'joblib']
+datas += copy_metadata('xgboost')
+tmp_ret = collect_all('xgboost')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
-    datas=[],
-    hiddenimports=[],
+    binaries=binaries,
+    datas=datas,
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

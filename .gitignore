@@ -1,0 +1,6 @@
+# Ignorar binarios pesados y carpetas de compilación de PyInstaller/Tauri
+*.exe
+*.pkg
+backend/build/
+backend/dist/
+frontend/src-tauri/binaries/
