@@ -83,6 +83,7 @@ async def lifespan(app: FastAPI):
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS detecciones (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tipo_documento TEXT NOT NULL,
             numero INTEGER NOT NULL,
             es_fraude INTEGER NOT NULL,
             tipo_fraude TEXT,
@@ -181,8 +182,8 @@ def detect_fraud(tx: Transaccion):
     conn = sqlite3.connect('fraudes.db')
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO detecciones (numero, es_fraude, tipo_fraude, payload) VALUES (?, ?, ?, ?)", 
-        (tx.numero, es_fraude_bool, tipo_fraude_pred, payload_str)
+        "INSERT INTO detecciones (tipo_documento, numero, es_fraude, tipo_fraude, payload) VALUES (?, ?, ?, ?, ?)", 
+        (str(tx.tipo), tx.numero, es_fraude_bool, tipo_fraude_pred, payload_str)
     )
     conn.commit()
     conn.close()
@@ -262,9 +263,10 @@ def detect_bulk(txs: List[Transaccion]):
             payload_str = json.dumps(datos_completos)
 
             # 4. Inserción masiva
+            tipo_ingresado = str(datos_completos.get('tipo', 'GEN')).strip()
             cursor.execute(
-                "INSERT INTO detecciones (numero, es_fraude, tipo_fraude, payload) VALUES (?, ?, ?, ?)", 
-                (int(tx.numero), es_fraude_bool, tipo_fraude_pred, payload_str)
+                "INSERT INTO detecciones (tipo_documento, numero, es_fraude, tipo_fraude, payload) VALUES (?, ?, ?, ?, ?)", 
+                (tipo_ingresado, int(tx.numero), es_fraude_bool, tipo_fraude_pred, payload_str)
             )
             registros_procesados += 1
         

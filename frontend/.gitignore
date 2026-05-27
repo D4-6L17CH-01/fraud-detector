@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Bases de datos locales
+*.db
+*.sqlite
+*.sqlite3
+src-tauri/fraudes.db
