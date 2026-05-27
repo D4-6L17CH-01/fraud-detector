@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 import math
 import numpy as np
+from typing import List
 
 EXPECTED_FEATURES = [
     'c1105', 'c1110', 'c1305', 'c1330', 'c1355', 'c1365', 'c1370', 'c1380', 'c1435', 'c1499', 
@@ -191,6 +192,93 @@ def detect_fraud(tx: Transaccion):
         "fraud_detected": es_fraude_bool, 
         "fraud_type": tipo_fraude_pred
     }
+
+@app.post("/detect-bulk")
+def detect_bulk(txs: List[Transaccion]):
+    try:
+        conn = sqlite3.connect('fraudes.db')
+        cursor = conn.cursor()
+
+        registros_procesados = 0
+        fraudes_detectados = 0
+
+        # Iteramos sobre la lista de JSONs que mandó React
+        for tx in txs:
+            datos_completos = tx.model_dump()
+            
+            # 1. Limpieza de las comas asquerosas
+            for key, value in datos_completos.items():
+                if isinstance(value, str) and ',' in value:
+                    datos_completos[key] = float(value.replace(',', '.'))
+            
+            # 2. El mismo embudo de las 177 características
+            features_dict = {col: 0.0 for col in EXPECTED_FEATURES}
+            monto_total = 0.0
+            num_cuentas_act = 0
+
+            for key, value in datos_completos.items():
+                if key in EXPECTED_FEATURES:
+                    try:
+                        m_val = float(value)
+                        features_dict[key] = m_val
+                        if m_val != 0:
+                            monto_total += abs(m_val)
+                            num_cuentas_act += 1
+                    except:
+                        pass
+            
+            features_dict['fe_monto_total'] = monto_total
+            features_dict['fe_num_cuentas_act'] = num_cuentas_act
+            features_dict['fe_log_monto'] = math.log1p(monto_total) if monto_total > 0 else 0
+            
+            mes = int(datos_completos.get('mes', 1))
+            dia = int(datos_completos.get('dia', 1))
+            features_dict['fe_trimestre'] = math.ceil(mes / 3)
+            features_dict['fe_inicio_mes'] = 1 if dia <= 5 else 0
+            features_dict['fe_fin_de_mes'] = 1 if dia >= 25 else 0
+            features_dict['fe_mes_sin'] = math.sin(2 * math.pi * mes / 12.0)
+            features_dict['fe_mes_cos'] = math.cos(2 * math.pi * mes / 12.0)
+            features_dict['fe_dia_sin'] = math.sin(2 * math.pi * dia / 31.0)
+            features_dict['fe_dia_cos'] = math.cos(2 * math.pi * dia / 31.0)
+
+            tipo_ingresado = str(datos_completos.get('tipo', 'GEN')).strip().lower()
+            columna_tipo = f"fe_tipo_{tipo_ingresado}"
+            if columna_tipo in EXPECTED_FEATURES:
+                features_dict[columna_tipo] = 1.0
+            else:
+                features_dict['fe_tipo_infrequent_sklearn'] = 1.0
+            
+            df_pred = pd.DataFrame([features_dict], columns=EXPECTED_FEATURES)
+            
+            # 3. Predicción
+            es_fraude_pred = modelo_binario.predict(df_pred)[0]
+            tipo_fraude_pred = "Limpio"
+            
+            if es_fraude_pred == 1:
+                tipo_fraude_pred = str(modelo_multiclase.predict(df_pred)[0])
+                fraudes_detectados += 1
+                
+            es_fraude_bool = bool(es_fraude_pred == 1)
+            payload_str = json.dumps(datos_completos)
+
+            # 4. Inserción masiva
+            cursor.execute(
+                "INSERT INTO detecciones (numero, es_fraude, tipo_fraude, payload) VALUES (?, ?, ?, ?)", 
+                (int(tx.numero), es_fraude_bool, tipo_fraude_pred, payload_str)
+            )
+            registros_procesados += 1
+        
+        conn.commit()
+        conn.close()
+        
+        return {
+            "status": "ok", 
+            "procesados": registros_procesados, 
+            "fraudes": fraudes_detectados
+        }
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
 
 @app.get("/history")
 def get_historial():
