@@ -109,6 +109,7 @@ function DashboardPrincipal() {
       },
       error: (error) => {
         alert("Error leyendo el CSV. Dile al contador que lo guarde bien.");
+        console.error('Error info',error)
         setIsUploading(false);
       }
     })
