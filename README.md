@@ -83,7 +83,7 @@ mkdir -p src-tauri/binaries
 
 ```
 
-2. Copie el archivo ejecutable hacia la carpeta interna de Tauri y renómbrelo de forma exacta (ejemplo para Windows 64-bit):
+2. Copie el archivo ejecutable hacia la carpeta interna de Tauri y renómbrelo de forma exacta motor_ia-x86_64-pc-windows-msvc.exe (ejemplo para Windows 64-bit), si la carpeta binaries no existe es necesario crearla:
 
 ```powershell
 copy ..\backend\dist\motor_ia.exe .\src-tauri\binaries\motor_ia-x86_64-pc-windows-msvc.exe
