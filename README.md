@@ -132,70 +132,130 @@ pnpm tauri build
 
 Una vez desplegada la aplicación, el software contable externo puede interactuar mediante peticiones **POST** dirigidas al endpoint expuesto en la dirección: `http://127.0.0.1:8000/detect`.
 
-### Ejemplo 4.1: Transacción Regular (Diagnóstico: Limpio)
+> Los datos de ejemplo para pruebas se encuentran en la carpeta `extras/`. Allí encontrará `extras/data.csv` y `extras/data.json` con registros de transacciones listos para usar.
 
-Movimiento estándar de caja menor sin comportamiento anómalo.
+---
+
+### 4.1 Estructura del Payload
+
+Cada transacción debe enviarse como un objeto JSON con los siguientes campos. Las cuentas del PUC no incluidas se asumen en `0` automáticamente.
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `numero` | `int` | Número del comprobante contable |
+| `tipo` | `string` | Código del tipo de documento (ej: `"C18"`, `"E22"`) |
+| `ano` | `int` | Año de la transacción |
+| `mes` | `int` | Mes de la transacción (1–12) |
+| `dia` | `int` | Día de la transacción (1–31) |
+| `c1105`, `c1110`, ... | `number` | Cuentas del PUC con sus montos. Los valores decimales usan **coma** como separador (ej: `"25000000,50"`) |
+
+Ejemplo de payload mínimo:
 
 ```json
 {
+  "numero": 1002,
   "tipo": "C18",
-  "numero": 1001,
   "ano": 2026,
-  "mes": 5,
-  "dia": 21,
-  "c1105": 150000.0,
-  "c1110": 0.0,
-  "c1305": 0.0,
-  "c2335": 150000.0,
-  "c4135": 0.0,
-  "c5105": 0.0
+  "mes": 6,
+  "dia": 15,
+  "c1105": 50000,
+  "c2335": 50000
 }
-
 ```
 
-### Ejemplo 4.2: Alerta de Anomalía Crítica (Diagnóstico: Fraude)
-
-Inyecta un volumen monetario desproporcionado en fechas de corte e incluye comas tipográficas para forzar la activación del pipeline de limpieza.
+Respuesta esperada del servidor:
 
 ```json
 {
-  "tipo": "E22",
-  "numero": 666,
-  "ano": 2026,
-  "mes": 12,
-  "dia": 31,
-  "c1105": "15000000,99",
-  "c1110": "0,00",
-  "c1524": 0.0,
-  "c2105": 0.0,
-  "c4135": "15000000,99",
-  "c5105": 0.0,
-  "c5220": "0,00"
+  "status": "ok",
+  "fraud_detected": false,
+  "fraud_type": "Limpio"
 }
-
 ```
 
-### Ejemplo 4.3: Registro Híbrido Multicuenta (Prueba de Robustez)
+---
 
-Prueba la tolerancia estructural del backend y la expansión matricial a las características requeridas por XGBoost.
+### 4.2 Opción A: Prueba mediante Postman o Insomnia
+
+Esta es la forma más directa para probar el endpoint de forma individual.
+
+**Paso 1:** Asegúrese de que la aplicación esté corriendo. El backend estará disponible en `http://127.0.0.1:8000`.
+
+**Paso 2:** Cree una nueva petición con la siguiente configuración:
+
+* Método: `POST`
+* URL: `http://127.0.0.1:8000/detect`
+* Header: `Content-Type: application/json`
+
+**Paso 3:** En el cuerpo de la petición (Body → raw → JSON), pegue uno de los registros del archivo `extras/data.json`:
 
 ```json
 {
-  "tipo": "N01",
-  "numero": 9999,
+  "numero": 1002,
+  "tipo": "C18",
   "ano": 2026,
-  "mes": 1,
-  "dia": 1,
-  "c1105": 0.0,
-  "c1110": 5000.0,
-  "c1305": "2000,50",
-  "c1435": 3000.0,
-  "c1524": 4000.0,
-  "c2105": 10000.0,
-  "c5105": 4000.0
+  "mes": 6,
+  "dia": 15,
+  "c1105": 50000,
+  "c2335": 50000
 }
+```
+
+**Paso 4:** Envíe la petición y verifique la respuesta en el panel inferior.
+
+![Insomnia Single detect](./extras/images/http-detect.png)
+
+Para probar el endpoint de **procesamiento masivo**, cambie la URL a `http://127.0.0.1:8000/detect-bulk` y envíe un array JSON con múltiples transacciones (puede usar el contenido completo de `extras/data.json` directamente).
+
+![Insomnia Bulk detect](./extras/images/http-bulk.png)
+
+---
+
+### 4.3 Opción B: Carga masiva desde la interfaz gráfica (archivo CSV)
+
+La aplicación permite cargar un archivo `.csv` directamente desde la UI para procesar múltiples transacciones en lote.
+
+**Paso 1:** Prepare su archivo `.csv` siguiendo el formato del archivo de ejemplo ubicado en `extras/data.csv`. Las columnas requeridas son:
 
 ```
+numero,tipo,ano,mes,dia,c1105,c1110,c1305,c1524,c2105,c2335,c4135,c5105,c5220
+```
+
+> Importante: los valores decimales deben usar **coma** como separador decimal (formato colombiano), por ejemplo: `"25000000,50"`. Las columnas de cuentas no utilizadas deben enviarse con valor `0`.
+
+**Paso 2:** Abra la aplicación Detector 3000 y navegue a la sección de carga masiva.
+
+**Paso 3:** Seleccione o arrastre el archivo `.csv` al área de carga.
+
+**Paso 4:** Confirme el procesamiento. La aplicación enviará internamente cada fila al endpoint `/detect-bulk` y mostrará los resultados en pantalla.
+
+![Boton CSV](./extras/images/boton-csv.png)
+
+![UI de CSV](./extras/images/ui-csv.png)
+
+---
+
+### 4.4 Opción C: Generación de archivo Excel para pruebas
+
+Si prefiere preparar los datos desde Excel antes de exportarlos a `.csv`:
+
+**Paso 1:** Abra Excel y cree un libro nuevo.
+
+**Paso 2:** En la primera fila, defina los encabezados exactamente como aparecen en `extras/data.csv`:
+
+```
+numero | tipo | ano | mes | dia | c1105 | c1110 | c1305 | c1524 | c2105 | c2335 | c4135 | c5105 | c5220
+```
+
+**Paso 3:** Complete las filas con sus datos de prueba. Para los montos decimales, use la coma como separador decimal (configuración regional colombiana).
+
+**Paso 4:** Guarde el archivo como **CSV (delimitado por comas)**: `Archivo → Guardar como → CSV UTF-8 (delimitado por comas)`.
+
+> Si Excel exporta los decimales con punto en lugar de coma, puede reemplazarlos manualmente con `Ctrl+H` antes de guardar, o ajustar la configuración regional del sistema operativo.
+
+**Paso 5:** Use el archivo `.csv` generado siguiendo los pasos de la **Opción B**.
+
+![Estructura informe excel](./extras/images/excel-report.png)
 
 ---
 
